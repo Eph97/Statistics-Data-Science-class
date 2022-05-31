@@ -9,6 +9,7 @@ I Will update this as we go.
 ## Week1 
 
 ### May 31st 2022
+- Download this file [a link](https://www.google.com)
 
 
 # Contact Me
