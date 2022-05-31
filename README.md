@@ -9,7 +9,7 @@ I Will update this as we go.
 ## Week1 
 
 ### May 31st 2022
-- Download this file [a link](https://www.google.com)
+- Download this [Nba Data](https://www.kaggle.com/datasets/nathanlauga/nba-games/code)
 
 
 # Contact Me
