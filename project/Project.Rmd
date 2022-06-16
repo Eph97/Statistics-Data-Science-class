@@ -79,8 +79,6 @@ In this project, we will analyze how many wins teams should have had given their
 
 # How?
 
-We are obviously not the first to ask these types of questions so we can use ideas that other sports statisticians have developed.
-
 
 The field of baseball analytics (known as Sabermetrics) has a very developed approach to looking at these questions. One way sabermetricians think about this is through an idea known as Pythagorean Expectation.
 
@@ -139,11 +137,11 @@ calculate_expected_wins <- function(points_for, points_against, k=13.91) {
 
 # The NBA
 
-```{r nba_image, echo=FALSE, fig.cap="Source: https://sbcamericas.com/", out.width = '90%'}
-knitr::include_graphics("https://oddslifenetstorage.blob.core.windows.net/sbcamericas/2018/07/NBAApp-Playoffs18-Roku-1200x628-1068x559.jpg")
-```
+### Problem 1.1
 
-Now we'll import the data
+First we'll import the data
+
+Change the following paths to make them link to where you stored the data.
 ```{r, warning=FALSE, message=FALSE}
 nba_data <- read.csv("../data/games.csv", stringsAsFactors = FALSE)
 nba_data <- nba_data %>% filter(SEASON < 2019)
@@ -270,12 +268,6 @@ expected_wins_nba %>%
   theme_jason()
 ```
 
-## How close to reality in the NBA?
-
-So we saw that the RMSE for the college game was 3.15. We can also compare this to the average games difference in the NBA.
-
-The RMSE for the NBA is `r Metrics::rmse(expected_wins_nba$TotalWins, expected_wins_nba$ExpectedWins)`, slightly lower than for the college game, and even more impressive when you take in to account that the NBA season is 82 games long, while NCAA seasons are usually played over less than 40 games.
-
 ## Explainability through the years
 
 As seen below, teams in the NBA generally win games in line with what their season scoring and defense would suggest they'd win, with the $Adjusted\ R^{2}$ in all years being above 90% for all years analysed other than the 2005 and 2006 seasons (even they were virtually 90%).
@@ -369,9 +361,7 @@ Importantly, Pythagorean Expectation models can also be used to predict a team's
 
 For example, if the Atlanta Hawks had an expected win factor of `0.3285023` in the 2017 season, we can make a prediction on this seasons win total by multiplying the number of regular season games played (generally 82 games) by our factor, to get an expected wins total in the 2018 season of `r round(0.3285023*82,2)` games - their actual win total for the 2018 season was 29 so this is a pretty good estimate.
 
-That nice example aside, the RMSE of the predicted wins is `r round(Metrics::rmse(predicted_wins_nba$TotalWins, predicted_wins_nba$PredictedWins),2)` games, with an $Adjusted\ R^{2}$ of `r round(summary(lm(TotalWins ~ PreviousEWF, data = predicted_wins_nba))$adj.r.squared,4)`.
-
-To truly see how well we can predict the subsequent year's performance, we can look at the distribution.
+To get a sense for how well we can predict the subsequent year's performance, we can look at the distribution.
 
 ```{r, warning=FALSE, message=FALSE}
 a <- predicted_wins_nba %>% 
@@ -396,11 +386,14 @@ a +
              arrow = arrow(length = unit(0.02, "npc")), curvature = 0.2, colour=plot_cols[8])
 ```
 
+# Observations
+The following sections are some more observations you can play with. They don't require you to do anything more but you can feel free to play with the numbers are you please.
+
 ## Superstars Make a Difference
 
-While the distribution above looks fairly normally distributed, there are some large errors in predicted wins and these are displayed below.
+While the distribution above looks fairly normally distributed, there are some large errors in predicted wins. These are displayed below.
 
-Possible Explanations:
+Possible explanations:
 
 -   The 2010 Cavs performed the worst in our predictions - this season was LeBron's first after "The Decision" to move to Miami
 -   The 2014 Timberwolves were the second worst against our prediction, which again can largely be attributed to a star leaving before the start of the season - Kevin Love was traded to the again Lebron-led Cavs for number 1 draft pick Andrew Wiggins
