@@ -51,6 +51,7 @@ print(teams[teams$ARENACAPACITY == 0 , "ABBREVIATION"])
 
 ```
 
+We learned about tidyverse and ggplot and the powerful syntax they provide.
 ```{r}
 
 library("ggplot2")
@@ -58,7 +59,7 @@ library("tidyverse")
 
 ```
 
-Next we're going to play around with this. let's create a new column two ways. First using base. And then using dplyr
+We showed how things could be accomplished in both base R and in tidyverse. 
 
 ```{r}
 
@@ -72,6 +73,7 @@ ranking <- ranking %>% separate(STANDINGSDATE, c("year","month", "day"))
 
 ```
 
+We played around with arena information and learned about missing values and adding new variables.
 ```{r}
 teams %>% select(NICKNAME, ARENA, ARENACAPACITY) %>% mutate(mean = mean(ARENACAPACITY, na.rm = TRUE))
 
@@ -102,9 +104,9 @@ mean_away <- mean(games$PTS_away, na.rm = TRUE)
 mean_home - mean_away
 ```
 
-We clearly see above that the home team does marginally better. This is what many of us might expect. But the result is not that large. Do we know if this could be just by chance? In otherwords, what is the probability that the mean difference is instead `0`?
+We clearly see above that the home team does marginally better. This is what many of us might expect. But the result is not that large. Do we know if this could be just by chance? In other words, what is the probability that the mean difference is instead `0`?
 
-In Statistics we have a way of testing this called a t-test.
+In Statistics we have a way of testing this called a t-test. We'll come back to this.
 
 ```{r}
 ggplot() + 
@@ -116,6 +118,7 @@ ggplot() +
         x ="Points", y = "Density")
 ```
 
+We started looking at season stats for players.
 ```{r}
 # games_details %>% group_by(PLAYER_ID) %>% summarise(mean_plus_minus = mean(PLUS_MINUS, na.rm = TRUE)) %>% select(PLAYER_ID, PLAYER_NAME, PLUS_MINUS, mean_plus_minus) %>% arrange(desc(mean_plus_minus))
 
@@ -133,18 +136,11 @@ games_details %>% group_by(PLAYER_ID, PLAYER_NAME) %>% select(PLAYER_ID, PLAYER_
 games_details %>% group_by(PLAYER_ID, PLAYER_NAME) %>% summarise(mean_plus_minus = mean(PLUS_MINUS, na.rm = TRUE), num_games = sum(!is.na(PLUS_MINUS))) %>% arrange(desc(mean_plus_minus)) %>% filter(num_games >= 350)
 ```
 
-```{r}
-ggplot() +
-  geom_density(data = games, aes(x = PTS_home, fill = "Blue"), alpha=0.3) + 
-    geom_density(data = games, aes(x = PTS_away, fill = "Red"), alpha = 0.3) 
 
-               
-                # geom_density(data = games, aes(x = PTS_home, fill = "r"), alpha = 0.3) +
-
-```
 
 # Chef Curry
 
+Here we played around with merging data from different dataframes.
 ```{r}
 players = games_details %>% select(-c("TEAM_ID", "TEAM_CITY", "PLAYER_ID", "COMMENT"))
   
@@ -160,66 +156,38 @@ stats <- left_join(players, games_date, by = c("GAME_ID"))
 head(stats)
 ```
 
+We then learned about how to chain commands together in the tidyverse (or dplyr) syntax using pipes. We learned how to group datasets by variables of interest and perform computations within these groups.
+
 ```{r}
-# seasonal_stats = stats.groupby("SEASON").sum()/stats.groupby("SEASON").count()
-seasonal_stats <- stats %>% group_by(SEASON, PLAYER_NAME) %>% summarise(PTS = mean(PTS, na.rm=TRUE)) %>% arrange(SEASON) %>% ungroup() %>% group_by(PLAYER_NAME) %>% filter(any(PTS > 25))
+seasonal_stats <- stats %>% group_by(SEASON, PLAYER_NAME) %>% summarise(PTS = mean(PTS, na.rm=TRUE)) %>% arrange(SEASON)
 seasonal_stats
 ```
 
-
-
-
-
+Last weekends homework.
 
 ```{r}
 
 select_players <- function (players) {
  seasonal_stats %>% filter(PLAYER_NAME %in% players) %>%
-  ggplot(aes(x=factor(SEASON), y=PTS, group=PLAYER_NAME, fill=PLAYER_NAME, colour=PLAYER_NAME)) + geom_line(stat="identity", show.legend = TRUE) + labs(x="Season", y="Points Per Season") + theme(
-    axis.text.x=element_text(angle=90),
-  )
-  
+  ggplot(aes(x=factor(SEASON), y=PTS, group=PLAYER_NAME, fill=PLAYER_NAME, colour=PLAYER_NAME)) + geom_line(stat="identity", show.legend = TRUE) + labs(x="Season", y="Points Per Season") + 
+    theme( axis.text.x=element_text(angle=90) )
 }
 
 ```
 
-
 ```{r}
-select_players(players=c("Stephen Curry", "LeBron James", "Jayson Tatum"))
+select_players(players=c("Stephen Curry", "LeBron James", "Jayson Tatum", "Kawhi Leonard"))
 ```
-
-
 
 
 # Curry vs the rest of the league
 
+
+Here we learned how to summarise (collapse the data) across multiple columns or variables at once. We then plotted performance for the rest of the team against a player of our choice.
+
 ```{r}
 all_players <- games_details %>% select(PLAYER_NAME, FGM, FG_PCT, FG3_PCT, PTS, FG3M, FG3A, FTM, FT_PCT) %>% group_by(PLAYER_NAME) %>% summarise_all(sum, na.rm = TRUE)
 
-ggplot(all_players, aes(x=FGM, y=PTS)) + geom_point() + geom_point(data=all_players[all_players$PLAYER_NAME == "Stephen Curry",], aes(x=FGM, y=PTS), color='red') + labs(x="Points (PTS)", y="Field Goals Made (FGM)", title="Steph Curry vs the league", subtitle ="Points vs Number of Fieldgoals Made" )
+ggplot() + geom_point(data=all_players, aes(x=FGM, y=PTS)) + geom_point(data=all_players[all_players$PLAYER_NAME == "Stephen Curry",], aes(x=FGM, y=PTS), color='red') + labs(x="Field Goals Made (FGM)", y="Points (PTS)", title="Steph Curry vs the league", subtitle ="Points vs Number of Fieldgoals Made" ) + geom_abline(slope = 2, intercept = 0)
 ```
 
-
-
-```{r}
-# fig, axes = plt.subplots(2,2, figsize=(15,10))
-# fig.suptitle("Stephen Curry vs Other Players Since 2003", fontsize=20)
-# 
-# sns.scatterplot(all_players["FGM"], all_players["PTS"], ax = axes[0][0])
-# sns.scatterplot(x="FGM", y="PTS", data=all_players[all_players.index == "Stephen Curry"], ax = axes[0][0])
-# axes[0][0].title.set_text('Field Goals Made and Points')
-# 
-# sns.scatterplot(all_players["FGM"], all_players["FG_PCT"], ax = axes[0][1])
-# sns.scatterplot(x="FGM", y="FG_PCT", data=all_players[all_players.index == "Stephen Curry"], ax = axes[0][1])
-# axes[0][1].title.set_text('Field Goals Made and Percantages')
-# 
-# sns.scatterplot(all_players["FG3M"], all_players["FG3_PCT"], ax = axes[1][0])
-# sns.scatterplot(x="FG3M", y="FG3_PCT", data=all_players[all_players.index == "Stephen Curry"], ax = axes[1][0])
-# axes[1][0].title.set_text('Three Point Made and Attempts')
-# 
-# sns.scatterplot(all_players["FTM"], all_players["FT_PCT"], ax = axes[1][1])
-# sns.scatterplot(x="FTM", y="FT_PCT", data=all_players[all_players.index == "Stephen Curry"], ax = axes[1][1])
-# axes[1][1].title.set_text('Free Throw Made and Percantages')
-# 
-# fig.tight_layout()
-```
