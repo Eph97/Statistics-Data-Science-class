@@ -1,0 +1,500 @@
+---
+title: "Expected Wins using Pythagorean Expectation"
+date: "15/02/2020"
+output:
+  html_document:
+    # code_folding: hide
+    theme: journal
+    highlight: tango
+    df_print: paged
+    fig_height: 8
+    fig_width: 11
+    number_sections: true
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, warning=FALSE, message=FALSE}
+library(tidyverse)
+library(scales)
+library(gridExtra)
+library(ggExtra)
+library(patchwork)
+library(purrr)
+library(broom)
+
+
+# set up plotting theme
+theme_jason <- function(legend_pos="top", base_size=12, font=NA){
+  
+  # come up with some default text details
+  txt <- element_text(size = base_size+3, colour = "black", face = "plain")
+  bold_txt <- element_text(size = base_size+3, colour = "black", face = "bold")
+  
+  # use the theme_minimal() theme as a baseline
+  theme_minimal(base_size = base_size, base_family = font)+
+    theme(text = txt,
+          # axis title and text
+          axis.title.x = element_text(size = 15, hjust = 1),
+          axis.title.y = element_text(size = 15),
+          # gridlines on plot
+          panel.grid.major = element_line(linetype = 2),
+          panel.grid.minor = element_line(linetype = 2),
+          # title and subtitle text
+          plot.title = element_text(size = 18, colour = "grey25", face = "bold"),
+          plot.subtitle = element_text(size = 16, colour = "grey44"),
+
+          ###### clean up!
+          legend.key = element_blank(),
+          # the strip.* arguments are for faceted plots
+          strip.background = element_blank(),
+          strip.text = element_text(face = "bold", size = 13, colour = "grey35")) +
+
+    #----- AXIS -----#
+    theme(
+      #### remove Tick marks
+      axis.ticks=element_blank(),
+
+      ### legend depends on argument in function and no title
+      legend.position = legend_pos,
+      legend.title = element_blank(),
+      legend.background = element_rect(fill = NULL, size = 0.5,linetype = 2)
+
+    )
+}
+
+
+plot_cols <- c("#498972", "#3E8193", "#BC6E2E", "#A09D3C", "#E06E77", "#7589BC", "#A57BAF", "#4D4D4D")
+
+```
+
+# Introduction
+
+In this project, we will analyze how many wins teams should have had given their performances over the season and compare them to their actual wins achieved.
+
+
+# How?
+
+We are obviously not the first to ask these types of questions so we can use ideas that other sports statisticians have developed.
+
+
+The field of baseball analytics (known as Sabermetrics) has a very developed approach to looking at these questions. One way sabermetricians think about this is through an idea known as Pythagorean Expectation.
+
+
+Now we all know Pythagorean's formula, $a^2 + b^2 = c^2$. Pythagorean expectation gets its name from this formula because we can see (for baseball), the expected number of wins is simply the ratio $\frac{c^2}{a^2 + b^2}$.
+
+wikipedia gives the following explanation of Pythagorean expectation:
+
+> Pythagorean expectation is a sports analytics formula devised by Bill James to estimate the percentage of games a baseball team "should" have won based on the number of runs they scored and allowed. Comparing a team's actual and Pythagorean winning percentage can be used to make predictions and evaluate which teams are over-performing and under-performing. The name comes from the formula's resemblance to the Pythagorean theorem.
+
+James' formula is as follows:
+
+$win\ ratio_{baseball} = \frac{runs\ scored^{k}}{runs\ scored^{k}\ +\ runs\ allowed^{k}}$
+
+*Note: for baseball, the k-factor James came up with was 2, but has since been modified to 1.83 to better "fit"*
+
+To understand why the k-factor of 2 is a reasonable estimate, we can start by looking at how we might derive this formula for baseball.  
+If we assume a baseball team wins in proportion to their "quality", and that their "quality" is measured by the ratio of their runs scored to their runs allowed, then we can estimate our probability of a team winning against their opponent by looking at the relative quality.
+In other words, if team A scores 50 points and team B scores 40, then their respective "quality" ratings are $\frac{50}{40}$ and $\frac{40}{50}$ respectively. So looking at the ratios and simplifying we get A's probability of winning = $\frac{\frac{50}{40}}{\frac{50}{40} + \frac{40}{50}}= \frac{50^2}{50^2 + 40^2}$
+
+Using James' formula as a blueprint, the GM of the Houston Rockets Daryl Morey took the formula and modified it for basketball. He found that the best fit occurred when `k = 13.91`, leaving the following formula to calculate Pythagorean Expected wins for Basketball:
+
+$win\ ratio_{basketball} = \frac{points\ for^{13.91}}{points\ for^{13.91}\ +\ points\ against^{13.91}}$
+
+The output of this formula is then multiplied against games played to give the expected wins for the period analyzed.
+This expected wins value is then compared to the teams actual wins, to determine how much luck played a part in the team's season.
+
+## Different K's
+
+The `k` factor changes between sports because of the nature of the sports themselves. For instance, if more points are scored in a typical game, we might get a more precise estimate of a team's relative skill. If only a few points are scored during a game, some of these could be due to chance (who got fouled, was there a lucky break etc). Moreover, in games like basketball, the physical qualities of an athlete can be very important. A player who is 6'11" (giannis) can be incredibly difficult to guard simply because of their strength and height. In other sports, physical characteristics may not be as important and individual players may not be able to dominate in the same way. In this way, the role of chance in a game can also depend on how much specific qualities are allowed to dominate in the sport.
+
+In the table below, we can see some optimal k's for different sports. We can see then that of the sports listed, that basketball leaves much less up to chance than other sports.
+
+| Sport      | K\*   |
+|------------|-------|
+| Basketball | 13.91 |
+| NFL        | 2.37  |
+| NHL        | 2.15  |
+| EPL        | 1.3   |
+
+## How can we use it?
+
+The results have shown that winning more games than your Pythagorean Expectation tends to mean a team will decline the following season,
+while falling short of expectations in the current year tends to mean a team will improve the following season.
+
+### Problem 1
+fill in the function below to calculate the expected number of wins.
+```{r, message=FALSE, warning=FALSE}
+# create function to apply the formula
+calculate_expected_wins <- function(points_for, points_against, k=13.91) {
+  expected_wins <- ((points_for^k) / ((points_for^k) + (points_against^k)))
+}
+```
+
+------------------------------------------------------------------------
+
+# The NBA
+
+
+First we'll import the data
+```{r, warning=FALSE, message=FALSE}
+nba_data <- read.csv("../data/games.csv", stringsAsFactors = FALSE)
+nba_data <- nba_data %>% filter(SEASON < 2019)
+nba_teams <- read.csv("../data/teams.csv", stringsAsFactors = F)
+nba_teams <- nba_teams %>% mutate(TEAM_NAME = paste0(CITY, " ", NICKNAME)) %>% select(TEAM_ID, TEAM_NAME, ABBREVIATION)
+```
+
+Let's see how correlated our expected number of wins are with the actual number of wins.
+
+But first, our data doesn't include whether the game is preseason, regular season, or playoffs. We should add this.
+
+These dates are displayed below. Note, the 2011-12 season was a shortened season because of the Collective Bargaining agreement not being reached until well into the traditional start month (October).
+
+```{r, warning=FALSE, message=FALSE}
+# reshape our data to have each obeservation as a team in a season
+nba_data_reshape <- nba_data %>%
+  select(SEASON, GAME_DATE_EST, TEAM_ID=HOME_TEAM_ID, POINTS_FOR= PTS_home, OPPONENT_ID=VISITOR_TEAM_ID, POINTS_AGAINST=PTS_away, HOME_TEAM_WINS) %>% 
+  mutate(LOC="Home",
+         Win = ifelse(HOME_TEAM_WINS == 1, 1, 0)) %>% 
+  rbind(nba_data %>%
+          select(SEASON, GAME_DATE_EST, TEAM_ID=VISITOR_TEAM_ID, POINTS_FOR= PTS_away, OPPONENT_ID=HOME_TEAM_ID, POINTS_AGAINST=PTS_home, HOME_TEAM_WINS) %>%
+          mutate(LOC="Away",
+                 Win = ifelse(HOME_TEAM_WINS == 0, 1, 0))
+    
+  )
+
+# Playoff star dates found on Wikepedia
+playoff_dates <- data.frame(SEASON= c(2003:2018),
+                            playoff_start_date = lubridate::ymd(c("2019-04-13",
+                                                   "2018-04-14",
+                                                   "2017-04-15",
+                                                   "2016-04-16",
+                                                   "2015-04-18",
+                                                   "2014-04-19",
+                                                   "2013-04-20",
+                                                   "2012-04-28",
+                                                   "2011-04-16",
+                                                   "2010-04-17",
+                                                   "2009-04-18",
+                                                   "2008-04-19",
+                                                   "2007-04-21",
+                                                   "2006-04-22",
+                                                   "2005-04-23",
+                                                   "2004-04-17")),
+                            season_start_date = lubridate::ymd("2003-10-28",
+                                                               "2004-11-02",
+                                                               "2005-11-01",
+                                                               "2006-10-31",
+                                                               "2007-10-30",
+                                                               "2008-10-28",
+                                                               "2009-10-27",
+                                                               "2010-10-26",
+                                                               "2011-12-25", # lockout shortened season
+                                                               "2012-10-30",
+                                                               "2013-10-29",
+                                                               "2014-10-28",
+                                                               "2015-10-27",
+                                                               "2016-10-25",
+                                                               "2017-10-17",
+                                                               "2018-10-16"))
+# need to reverse playoff start date variable because manually entered in the wrong order
+playoff_dates$playoff_start_date <- rev(playoff_dates$playoff_start_date)
+
+
+playoff_dates %>% DT::datatable()
+```
+
+### Problem 2
+
+Below, fill in the code to merge playoff dates. Use the comments in the codeblock to guide you through what you have to do.
+```{r, warning=FALSE, message=FALSE}
+# join playoff and season start dates table
+nba_data_reshape <- nba_data_reshape %>% 
+  left_join(playoff_dates, by = "SEASON")
+
+# identify regular season games, playoff games and preseason games
+nba_data_reshape <- nba_data_reshape %>% 
+  mutate(GAME_DATE_EST = lubridate::ymd(GAME_DATE_EST)) %>% 
+  mutate(Playoff = GAME_DATE_EST >= playoff_start_date,
+         Preseason = GAME_DATE_EST < season_start_date) %>% 
+  mutate(RegularSeason = Playoff == FALSE & Preseason == FALSE)
+
+# join team names
+nba_data_reshape <- nba_data_reshape %>% 
+  left_join(nba_teams, by = "TEAM_ID")
+```
+
+
+### Problem 3
+
+We'll now compute the expected wins for regular season. Fill in the code below to compute the expected wins
+
+
+```{r} 
+# apply expected win formula and calculate expected wins
+expected_wins_nba <- nba_data_reshape %>% 
+  filter(RegularSeason) %>% 
+  group_by(SEASON, TEAM_ID, TEAM_NAME, ABBREVIATION) %>% 
+  summarise(GamesPlayed = n(),
+            TotalWins = sum(Win),
+            TotalPoints = sum(POINTS_FOR),
+            TotalPointsAgainst = sum(POINTS_AGAINST)) %>% 
+  mutate(ExpectedWinFactor = mapply(calculate_expected_wins, TotalPoints, TotalPointsAgainst, k=13.91),
+         ExpectedWins = ExpectedWinFactor * GamesPlayed) %>% ungroup()
+
+```
+
+```{r}
+# fit a linear model to assess explainability
+nba.lm <- lm(TotalWins ~ ExpectedWins, data = expected_wins_nba)
+```
+
+We can see below that teams in the NBA usually win as many games as they should and luck doesn't play as much much of a part in NBA team's performance as it does in other sports or leagues (something we can verify later). Additionally, we can also see that the relationship looks very linear.
+
+This can be confirmed by the very strong $Adjusted\ R^{2}$ of `r round(summary(nba.lm)$adj.r.squared,3)`
+
+We will come back to the idea of linear models and what an $adjusted R^2$ tells us. Roughly, the linear model tells us the linear best fit to the data. In our case, basically finding the $m$ and $b$ for a function of the form $y = mx +b$ that best fit the data. The $adjusted R^2$ then tells us how well that equation explains the data.
+
+
+Below we can see 
+```{r, warning=FALSE, message=FALSE}
+expected_wins_nba %>% 
+  ggplot(aes(x=ExpectedWins, y= TotalWins)) +
+  geom_point(position = "jitter", colour=plot_cols[2]) +
+  annotate("text", x= 20, y=60, label = paste0("NBA correlation: ", round(cor(expected_wins_nba$ExpectedWins, expected_wins_nba$TotalWins),4)), size=5, colour=plot_cols[8]) +
+  ggtitle("PYTHAGOREAN EXPECTEATION CLOSELY ALIGNED WITH ACTUALS", subtitle = "") +
+    geom_abline(slope = coef(nba.lm)[["ExpectedWins"]], 
+              intercept = coef(nba.lm)[["(Intercept)"]]) +
+  theme_jason()
+```
+
+## Come Back To How close to reality in the NBA?
+
+Another way we can assess how well our predicitions track with reality is to look at the Root Mean Squared Error (RMSE). This is 
+
+The RMSE for the NBA is `r Metrics::rmse(expected_wins_nba$TotalWins, expected_wins_nba$ExpectedWins)`, slightly lower than for the college game, and even more impressive when you take in to account that the NBA season is 82 games long, while NCAA seasons are usually played over less than 40 games.
+
+## Explainability through the years
+
+As seen below, teams in the NBA generally win games in line with what their season scoring and defense would suggest they'd win, with the $Adjusted\ R^{2}$ in all years being above 90% for all years analysed other than the 2005 and 2006 seasons (even they were virtually 90%).
+
+Some additional observations:
+
+-   The 2008 season went the closest to expected with an $Adjusted\ R^{2}$ of 98.4%
+-   The 2018 season was also followed fairly close to our expected number of wins.
+-   The lockout-shortened 2011 season didn't impact our model's ability to predict wins
+
+```{r, warning=FALSE, message=FALSE}
+# fit model and extract adjusted r-squared for each season
+nba_yearly_regressions <- expected_wins_nba %>% 
+  group_by(SEASON) %>% 
+  nest() %>% 
+  mutate(
+    fit = map(data, ~ lm(TotalWins ~ ExpectedWins, data = .x)),
+    tidied = map(fit, tidy),
+    glanced = map(fit, glance),
+    augmented = map(fit, augment)
+  ) %>% ungroup() %>% 
+  unnest(glanced) %>% 
+  select(SEASON, adj.r.squared)
+
+
+# plot adjusted R-squared for the years data available
+nba_yearly_regressions %>% 
+  ggplot(aes(x=SEASON, y= adj.r.squared)) +
+  # geom_smooth(colour=plot_cols[4]) +
+  geom_line(colour=plot_cols[2], size=2) + 
+  # geom_point(colour= plot_cols[8]) +
+  geom_label(aes(x= SEASON, y=adj.r.squared, label=paste0(SEASON, ":\n", round(adj.r.squared, 3)))) +
+  scale_y_continuous(limits = c(0.8, 1)) +
+  ggtitle("STRONG EXPLAINABILITY IN WINS", subtitle = "Adjusted R-squared of Actual Wins ~ Expected Wins well above 90% for\nalmost all seasons analysed") +
+  theme_jason() +
+  theme(axis.title.x = element_blank(), axis.text.x = element_blank(), axis.title.y = element_blank(), axis.text.y = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+```
+
+## Outlier seasons
+
+### Problem 4
+
+While most teams follow the line fairly well, the below teams had the 10 highest and lowest number of wins above expectation.
+
+Who exceeded and fell the farthest short of our expected number of wins?
+
+```{r, warning=FALSE, message=FALSE}
+expected_wins_nba <- expected_wins_nba %>% mutate(WinsAboveExpected = TotalWins - ExpectedWins)
+
+expected_wins_nba %>% 
+  select(TEAM_NAME, SEASON, TotalWins, ExpectedWins, WinsAboveExpected) %>% 
+  arrange(desc(WinsAboveExpected)) %>% 
+  top_n(10) %>% 
+  bind_rows(expected_wins_nba %>% 
+              select(TEAM_NAME, SEASON, TotalWins, ExpectedWins, WinsAboveExpected) %>% 
+              arrange(desc(WinsAboveExpected)) %>% 
+              top_n(-10)) %>% 
+  mutate(ExpectedWins = round(ExpectedWins, 2),
+         WinsAboveExpected = round(WinsAboveExpected, 2)) %>% 
+  mutate(WinsAboveExpected = kableExtra::cell_spec(WinsAboveExpected, "html", color = ifelse(WinsAboveExpected < 0, plot_cols[3], plot_cols[2]))) %>% 
+  kableExtra::kable(format = "html", escape = F) %>%
+  kableExtra::kable_styling("striped", full_width = F)
+  
+```
+
+## Explaining Wins the Following Season
+
+### Problem 5
+
+Fill in missing code
+```{r, warning=FALSE, message=FALSE}
+# create a df with performances against expectation
+predicted_wins_nba <- expected_wins_nba %>%
+  mutate(ThisSeasonPerformance = ifelse(WinsAboveExpected < -3, "Under Performed", 
+                                        ifelse(WinsAboveExpected > 3, "Over Performed", "Close to Expected"))) %>% 
+  arrange(TEAM_NAME, SEASON) %>% 
+  group_by(TEAM_NAME) %>% 
+  mutate(PreviousEWF = lag(ExpectedWinFactor),
+         PreviousWinsAboveExpected = lag(WinsAboveExpected),
+         PreviousSeasonPerformance = lag(ThisSeasonPerformance)) %>% 
+  filter(!is.na(PreviousEWF)) %>%
+  mutate(PredictedWins = PreviousEWF * GamesPlayed) %>% 
+  mutate(diff_predicted = TotalWins - PredictedWins) 
+
+
+predicted_wins_nba$PreviousWinsAboveExpectedGroup <- cut(predicted_wins_nba$PreviousWinsAboveExpected, breaks = c(-9:9))
+```
+
+Importantly, Pythagorean Expectation models can also be used to predict a team's win totals the following season. We can take the team's previous season's expected wins factor calculated using our formula, apply it to the number of games played the following season to get the predicted win totals for that season.
+
+For example, if the Atlanta Hawks had an expected win factor of `0.3285023` in the 2017 season, we can make a prediction on this seasons win total by multiplying the number of regular season games played (generally 82 games) by our factor, to get an expected wins total in the 2018 season of `r round(0.3285023*82,2)` games - their actual win total for the 2018 season was 29 so this is a pretty good estimate.
+
+That nice example aside, the RMSE of the predicted wins is `r round(Metrics::rmse(predicted_wins_nba$TotalWins, predicted_wins_nba$PredictedWins),2)` games, with an $Adjusted\ R^{2}$ of `r round(summary(lm(TotalWins ~ PreviousEWF, data = predicted_wins_nba))$adj.r.squared,4)`.
+
+To truly see how well we can predict the subsequent year's performance, we can look at the distribution.
+
+```{r, warning=FALSE, message=FALSE}
+a <- predicted_wins_nba %>% 
+  ggplot(aes(x= diff_predicted)) + 
+  geom_density(fill=plot_cols[8], alpha=0.2, colour=plot_cols[8]) +
+  scale_x_continuous(breaks = seq(from = -40, to=40, by=10), labels = seq(from = -40, to=40, by=10), limits = c(-40,40)) +
+  ggtitle("PREDICTING NEXT SEASONS WINS", subtitle = "Using the previous year's Pythagorean Expectation win factor to predict wins for the current season\nresults in 50% of the errors being within -6 and 6.8 games off") +
+  labs(x= "Prediction Error") +
+  theme_jason() +
+  theme(panel.grid.major = element_blank())
+
+b <- ggplot_build(a)$data[[1]]
+
+a +
+  geom_area(data = subset(b, between(x, quantile(predicted_wins_nba$diff_predicted)[["25%"]],
+                                     quantile(predicted_wins_nba$diff_predicted)[["75%"]])),
+                         aes(x=x,y=y),
+                         fill=plot_cols[2], alpha=0.5,
+                         colour="black") + # gives a nice border
+  annotate("text", x=30, y=0.025, label = "50% of our predictions fall\nwithin -6 and 6.8 games\nof actual wins", size=5, colour=plot_cols[8]) +
+  geom_curve(x = 20, y = 0.025, xend = 0, yend = 0.02, 
+             arrow = arrow(length = unit(0.02, "npc")), curvature = 0.2, colour=plot_cols[8])
+```
+
+# Observations
+The following sections are some more observations you can play with. They don't require you to do anything more but you can feel free to play with the numbers are you please.
+
+## Superstars Make a Difference
+
+While the distribution above looks fairly normally distributed, there are some large errors in predicted wins. These are displayed below.
+
+Possible explanations:
+
+-   The 2010 Cavs performed the worst in our predictions - this season was LeBron's first after "The Decision" to move to Miami
+-   The 2014 Timberwolves were the second worst against our prediction, which again can largely be attributed to a star leaving before the start of the season - Kevin Love was traded to the again Lebron-led Cavs for number 1 draft pick Andrew Wiggins
+-   At the other end of the spectrum, the 66 win 2007 Champion Boston Celtics had their first full seasons with future hall of famers Paul Pierce, Kevin Garnett and Ray Allen
+-   Similarly, the 2004 Phoenix Suns won almost 32 games more than predicted largely due to Steve Nash helping them all the way to the Western Conference finals
+
+```{r, warning=FALSE, message=FALSE}
+predicted_wins_nba %>% 
+  select(TEAM_NAME, SEASON, TotalWins, PredictedWins, diff_predicted) %>% 
+  arrange(desc(diff_predicted)) %>% 
+  top_n(10) %>% 
+  bind_rows(predicted_wins_nba %>% 
+              select(TEAM_NAME, SEASON, TotalWins, PredictedWins, diff_predicted) %>%
+              arrange(desc(diff_predicted)) %>% 
+              top_n(-10)) %>% 
+  mutate(PredictedWins = round(PredictedWins, 2),
+         diff_predicted = round(diff_predicted, 2)) %>% 
+  filter(diff_predicted < -25 | diff_predicted > 25) %>% 
+  mutate(diff_predicted = kableExtra::cell_spec(diff_predicted, "html", color = ifelse(diff_predicted < 0, plot_cols[3], plot_cols[2]))) %>% 
+  kableExtra::kable(format = "html", escape = F) %>%
+  kableExtra::kable_styling("striped", full_width = F)
+  
+```
+
+## Does Regression Occur in the NBA?
+
+We can also analyse what happened to teams the following season after over-performing in relation to expectation, and vice-versa to see if teams also experience *regression to the mean*.
+
+**Some Explanations:**
+
+-   *Over Performed* - If a team won n **more** games than expected
+-   *Under Performed* - If a team won n **less** games than expected
+-   *Close to Expected* - If a team's wins or losses were within 1 game of expected
+
+To do this, we must determine what "over" or "under" performing is. The below plots try to show a number of different cutoff levels for game differences - one through five - meaning if the team's actual wins were greater than one game above their expected wins, they *over performed* that season, while if the team were greater than one full loss below expected, they *under performed* that season. The same logic holds for all the other cutoffs displayed below.
+
+So with this, we can see that as a team moves further away from their expected number of wins in the previous season, 
+they are then more likely to perform *close to expectation* the following season.
+
+When the team won or lost one or more games beyond expected (top plot), they were equally likely to either under or over perform the following season.
+Once the deviation from expected grew beyond two games, the likelihood of the team performing closer to expected the following season grew from \~48%, to \~90%
+
+```{r, warning=FALSE, message=FALSE}
+# plotting function to pass in a games total difference to determine if over or under performed
+plot_regression <- function(error, legend_pos="none") {
+  worse <- 0-error
+  better <- error
+  
+  dat <- expected_wins_nba %>%
+    mutate(ThisSeasonPerformance = ifelse(WinsAboveExpected < worse, "Under Performed", 
+                                          ifelse(WinsAboveExpected > better, "Over Performed", "Close to Expected"))) %>% 
+    mutate(ThisSeasonPerformance = factor(ThisSeasonPerformance)) %>% 
+    arrange(TEAM_NAME, SEASON) %>% 
+    group_by(TEAM_NAME) %>% 
+    mutate(PreviousEWF = lag(ExpectedWinFactor),
+           PreviousWinsAboveExpected = lag(WinsAboveExpected),
+           PreviousSeasonPerformance = lag(ThisSeasonPerformance)) %>% 
+    filter(!is.na(PreviousEWF)) %>%
+    
+    mutate(PredictedWins = PreviousEWF * GamesPlayed) %>% 
+    mutate(diff_predicted = TotalWins - PredictedWins) %>% ungroup() %>% 
+    group_by(PreviousSeasonPerformance, ThisSeasonPerformance) %>% 
+    summarise(n = n()) %>% 
+    mutate(perc = n / sum(n))
+  
+  dat %>% 
+    ggplot(aes(x=PreviousSeasonPerformance, y=perc, fill=forcats::fct_rev(ThisSeasonPerformance))) +
+    geom_col(colour=plot_cols[8]) +
+    scale_fill_manual(values = c(alpha(plot_cols[8], 0.3), alpha(plot_cols[8], 0.2), plot_cols[2])) +
+    scale_y_continuous(labels = percent) +
+    geom_text(aes(x= PreviousSeasonPerformance, label=percent(perc)), hjust=2, data = dat[dat$ThisSeasonPerformance == "Close to Expected",]) +
+    labs(x="Last Season", subtitle = paste0("Last Season Games Over/Under Performed = ", error)) +
+    coord_flip() +
+    theme_jason(legend_pos = legend_pos) +
+    theme(axis.title.x = element_blank(), 
+          panel.grid.major.x = element_blank(), panel.grid.major.y = element_blank(), 
+          panel.grid.minor.x = element_blank(), panel.grid.minor.y = element_blank()
+          )
+} 
+
+# create visualisation and patch together
+p1 <- plot_regression(error = 1)
+p2 <- plot_regression(error = 2)
+p3 <- plot_regression(error = 3)
+p4 <- plot_regression(error = 4)
+p5 <- plot_regression(error = 5, legend_pos = "bottom")
+
+ # patch plots
+(p1/p2/p3/p4/p5) + 
+  plot_annotation(title = "DID TEAMS IMPROVE OR REGRESS THE FOLLOWING SEASON?", 
+                  theme = theme(plot.title = element_text(size = 18, colour = "grey25", face = "bold")))
+```
+
+------------------------------------------------------------------------
