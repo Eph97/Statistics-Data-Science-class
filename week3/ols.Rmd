@@ -1,0 +1,33 @@
+---
+output: pdf_document
+---
+
+```{r loadData}
+library(tidyverse)
+expected_wins <- read.csv('expected_wins.csv')
+y <- expected_wins$TotalWins
+x <- expected_wins$ExpectedWins
+```
+
+Fill in the function to calculate the betas for OLS.
+
+Remember, we have a closed form expression for computing the betas in OLS: $\beta = (X'X)^{-1}X'y$
+
+However, recall that to solve this in the vectorized form, we add a column of ones allowing us to compute the $\beta_0$ for the linear equation $y = \beta_0 + \beta_1 x$. I've created a new matrix $W$ with this columns of ones so our new OLS formula becomes: $\beta = (W'W)^{-1}W'y$
+
+```{r}
+ols = function(y, ...){
+	w <- cbind(1, ...)
+  # Fill in missing code	
+	return (betas=betas)
+}
+
+ols(y,x)
+```
+
+R comes with a built-in linear models function which we can check our own computed betas against.
+
+```{r}
+# regressing y on x
+lm(TotalWins ~ ExpectedWins, data = expected_wins_nba)
+```
