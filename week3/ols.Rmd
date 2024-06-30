@@ -31,3 +31,7 @@ R comes with a built-in linear models function which we can check our own comput
 # regressing y on x
 lm(TotalWins ~ ExpectedWins, data = expected_wins_nba)
 ```
+
+
+
+
